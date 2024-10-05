@@ -1,0 +1,28 @@
+{
+    "tournament": "Eggyf",
+    "players": [
+        {
+            "name": "Arian",
+            "score": 1
+        },
+        {
+            "name": "deli",
+            "score": 0
+        },
+        {
+            "name": "melissa",
+            "score": 2
+        },
+        {
+            "name": "Abdel",
+            "score": 0
+        }
+    ],
+    "winner": "melissa",
+    "games": [
+        "Arian vs deli - Ganador: Arian",
+        "melissa vs Abdel - Ganador: melissa",
+        "melissa vs Arian - Ganador: melissa"
+    ],
+    "completed": true
+}

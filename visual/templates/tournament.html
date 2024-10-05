@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>{{ name }}</title>
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+    />
+  </head>
+  <body>
+    <div class="container mt-5">
+      <h1>Torneo: {{ name }}</h1>
+
+      <h2>Jugadores</h2>
+      <ul class="list-group mb-4">
+        {% for player in tournament.players %}
+        <li
+          class="list-group-item d-flex justify-content-between align-items-center"
+        >
+          {{ player.name }}
+          <span class="badge badge-info">{{ player.score }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+
+      {% if not tournament.completed %}
+      <h2>Agregar Jugador</h2>
+      <form action="/add_player/{{ name }}" method="post" class="mb-4">
+        <div class="form-group">
+          <input
+            type="text"
+            class="form-control"
+            name="player_name"
+            placeholder="Nombre del Jugador"
+            required
+          />
+        </div>
+        <button type="submit" class="btn btn-success">Agregar Jugador</button>
+      </form>
+
+      <h2>Iniciar Torneo</h2>
+      <form action="/start_tournament/{{ name }}" method="post" class="mb-4">
+        <button type="submit" class="btn btn-primary">Iniciar Torneo</button>
+      </form>
+
+      <h2>Registrar Ganador</h2>
+      <form action="/set_winner/{{ name }}" method="post" class="mb-4">
+        <div class="form-group">
+          <input
+            type="text"
+            class="form-control"
+            name="winner_name"
+            placeholder="Nombre del Ganador"
+            required
+          />
+        </div>
+        <button type="submit" class="btn btn-danger">Establecer Ganador</button>
+      </form>
+      {% else %}
+      <h3>Ganador del Torneo: {{ tournament.winner }}</h3>
+      <p class="text-success">Este torneo ha sido completado.</p>
+      {% endif %}
+
+      <h2>Historial de Juegos</h2>
+      <ul class="list-group mb-4">
+        {% for game in tournament.games %}
+        <li class="list-group-item">{{ game }}</li>
+        {% endfor %}
+      </ul>
+
+      <a href="/" class="btn btn-secondary">Volver a la Página Principal</a>
+    </div>
+  </body>
+</html>
