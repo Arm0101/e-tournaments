@@ -1,11 +1,15 @@
+import logging
+
 from .codes import *
 import socket
 from .utils import hash_function
 
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(threadName)s] %(levelname)s: %(message)s')
+
 
 class ChordNodeReference:
-    def __init__(self, ip: str, port: int = 8001):
-        self.id = hash_function(ip)
+    def __init__(self, ip: str, port: int = 8001, m: int = 8):
+        self.id = hash_function(ip, m)
         self.ip = ip
         self.port = port
 
@@ -13,11 +17,12 @@ class ChordNodeReference:
     def _send_data(self, op: int, data: str = None) -> bytes:
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(5)
                 s.connect((self.ip, self.port))
                 s.sendall(f'{op},{data}'.encode('utf-8'))
                 return s.recv(1024)
         except Exception as e:
-            print(f"Error sending data: {e}")
+            logging.error(f"Error sending data: {e}")
             return b''
 
     def send_predecessor_data(self):
@@ -43,21 +48,24 @@ class ChordNodeReference:
     @property
     def successor(self) -> 'ChordNodeReference':
         response = self._send_data(GET_SUCCESSOR).decode().split(',')
-        return ChordNodeReference(response[1], self.port)
+        if response:
+            return ChordNodeReference(response[1], self.port)
 
     # Property to get the predecessor of the current node
     @property
     def predecessor(self) -> 'ChordNodeReference':
+        logging.info(f'GET PREDECESSOR for {self.ip}:{self.port}')
         response = self._send_data(GET_PREDECESSOR).decode().split(',')
-        return ChordNodeReference(response[1], self.port)
+        if response:
+            return ChordNodeReference(response[1], self.port)
 
     # Method to notify the current node about another node
     def notify(self, node: 'ChordNodeReference'):
         self._send_data(NOTIFY, f'{node.id},{node.ip}')
 
     # Method to check if the predecessor is alive
-    def check_predecessor(self):
-        return self._send_data(CHECK_PREDECESSOR)
+    def check(self):
+        return self._send_data(CHECK)
 
     # Method to find the closest preceding finger of a given id
     def closest_preceding_finger(self, id: int) -> 'ChordNodeReference':

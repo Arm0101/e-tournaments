@@ -12,13 +12,14 @@ BROADCAST_PORT = 9001
 
 
 class ChordNode:
-    def __init__(self, ip: str, port: int = 8001, m: int = 160):
-        self.id = hash_function(ip)
+    def __init__(self, ip: str, port: int = 8001, m: int = 8):
+        self.id = hash_function(ip, m)
         self.ip = ip
         self.port = port
         self.ref = ChordNodeReference(self.ip, self.port)
         self.successor = self.ref
         self.predecessor = None
+        self.predecessor2 = None
         self.m = m
         self.finger = [self.ref] * self.m
         self.next = 0  # Finger table index to fix next
@@ -40,16 +41,22 @@ class ChordNode:
         new_node_ref = ChordNodeReference(node_ip, node_port)
         logging.info(new_node_ref)
         if node_id != self.id:
-
-            if ((self.predecessor is None and self.id > new_node_ref.id) or
-                    _inbetween(node_id, self.predecessor.id, self.id)):
+            if self.predecessor is None and self.id == self.successor.id:
                 self.predecessor = new_node_ref
-
                 self.predecessor.update_successor(self.ref)
                 logging.info(f"Update predecessor to {self.predecessor}")
 
-            if ((self.successor.id == self.ref.id and self.successor.id < new_node_ref.id) or
-                    _inbetween(node_id, self.id, self.successor.id)):
+                if new_node_ref.id > self.predecessor.id:
+                    self.successor = new_node_ref
+                    self.successor.update_predecessor(self.ref)
+                    logging.info(f"Update successor to {self.successor}")
+
+            if self.predecessor and _inbetween(node_id, self.predecessor.id, self.id):
+                self.predecessor = new_node_ref
+                self.predecessor.update_successor(self.ref)
+                logging.info(f"Update predecessor to {self.predecessor}")
+
+            if _inbetween(node_id, self.id, self.successor.id):
                 self.successor = new_node_ref
                 self.successor.update_predecessor(self.ref)
                 logging.info(f"Update successor to {self.successor}")
@@ -126,9 +133,8 @@ class ChordNode:
     def stabilize(self):
         while True:
             try:
-                if self.successor.id != self.id:
+                if self.successor and self.successor.id != self.id:
                     logging.info('stabilize')
-                    logging.info(f'successor for {self.ref} is {self.successor}')
                     x = self.successor.predecessor
                     logging.info(f'predecessor of successor: {x}')
                     if x and x.id != self.id:
@@ -137,7 +143,8 @@ class ChordNode:
                         self.successor.notify(self.ref)
             except Exception as e:
                 logging.error(f"Error in stabilize: {e}")
-            logging.info(f"successor : {self.successor} predecessor {self.predecessor}")
+
+            logging.info(f"(NODE_CON) successor : {self.successor} predecessor {self.predecessor}")
             time.sleep(10)
 
     # Notify method to inform the node about another node
@@ -158,29 +165,54 @@ class ChordNode:
                 self.finger[self.next] = self.find_successor((self.id + 2 ** self.next) % 2 ** self.m)
             except Exception as e:
                 logging.error(f"Error in fix_fingers: {e}")
-            time.sleep(10)
+            time.sleep(5)
 
     # Check predecessor method to periodically verify if the predecessor is alive
     def check_predecessor(self):
         while True:
             try:
+                # A --- B --- C --- D
+                logging.info(f'check_predecessor for {self.ip}')
                 logging.info(f'pred: {self.predecessor}')
+
                 if self.predecessor:
-                    resp = self.predecessor.check_predecessor()
+                    resp = self.predecessor.check()
                     logging.info(f'resp from: {self.predecessor} is {resp}')
                     if resp == b'':
-                        self.predecessor = self.find_predecessor(self.predecessor.id)
-                        logging.info(f'new pred : {self.predecessor}')
-                        self.predecessor.update_successor(self.ref)
+                        logging.info('pred1 is dead')
+                        new_predecessor = self.find_predecessor(self.predecessor.id)
+
+                        if not new_predecessor or new_predecessor.id == self.id:
+                            self.predecessor = None
+                            self.successor = self.ref
+                            continue
+                        self.predecessor = new_predecessor
+
+                        resp = self.predecessor.check()
+
+                        if resp == b'':
+                            logging.info('pred2 is dead')
+                            new_predecessor = self.find_predecessor(self.predecessor.id)
+
+                            if not new_predecessor or new_predecessor.id == self.id:
+                                self.predecessor = None
+                                self.successor = self.ref
+                                continue
+                            self.predecessor = new_predecessor
+                        else:
+
+                            logging.info(f'new pred : {new_predecessor}')
+                            self.predecessor = new_predecessor
+                            self.predecessor.update_successor(self.ref)
 
             except Exception as e:
                 logging.error(f"Error in check_predecessor: {e}")
                 self.predecessor = None
-            time.sleep(5)
+            time.sleep(10)
 
     # Store key method to store a key-value pair and replicate to the successor
     def store_key(self, key: str, value: str):
-        key_hash = hash_function(key)
+        key_hash = hash_function(key, self.m)
         node = self.find_successor(key_hash)
         node.store_key(key, value)
         self.data[key] = value  # Store in the current node
@@ -188,24 +220,25 @@ class ChordNode:
 
     # Retrieve key method to get a value for a given key
     def retrieve_key(self, key: str) -> str:
-        key_hash = hash_function(key)
+        key_hash = hash_function(key, self.m)
         node = self.find_successor(key_hash)
         return node.retrieve_key(key)
 
     def get_data_from_predecessors(self):
-        while True:
-            if self.predecessor and self.predecessor.id != self.id:
-
-                self.pred_data = self.predecessor.send_predecessor_data().decode()
-                pred2 = self.find_predecessor(self.predecessor.id)
-
-                self.pred2_data = ''
-
-                if pred2 and self.id != pred2.id and self.predecessor.id != pred2.id:
-                    self.pred2_data = pred2.send_predecessor_data().decode()
-
-            logging.info(f'pred: {self.pred_data}, pred2: {self.pred2_data}')
-            time.sleep(5)
+        pass
+        # while True:
+        #     if self.predecessor and self.predecessor.id != self.id:
+        #
+        #         self.pred_data = self.predecessor.send_predecessor_data().decode()
+        #         pred2 = self.find_predecessor(self.predecessor.id)
+        #
+        #         self.pred2_data = ''
+        #
+        #         if pred2 and self.id != pred2.id and self.predecessor.id != pred2.id:
+        #             self.pred2_data = pred2.send_predecessor_data().decode()
+        #
+        #     logging.info(f'pred: {self.pred_data}, pred2: {self.pred2_data}')
+        #     time.sleep(5)
 
     # Start server method to handle incoming requests
     def start_server(self):
@@ -218,9 +251,7 @@ class ChordNode:
             while True:
                 conn, addr = s.accept()
                 logging.info(f'new connection from {addr}')
-
                 data = conn.recv(1024).decode().split(',')
-
                 data_resp = None
                 option = int(data[0])
 
@@ -238,7 +269,7 @@ class ChordNode:
                 elif option == NOTIFY:
                     ip = data[2]
                     self.notify(ChordNodeReference(ip, self.port))
-                elif option == CHECK_PREDECESSOR:
+                elif option == CHECK:
                     conn.sendall("OK".encode())
                     conn.close()
 

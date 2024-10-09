@@ -1,8 +1,8 @@
 import hashlib
 
 
-def hash_function(data: str):
-    return int(hashlib.sha1(data.encode()).hexdigest(), 16)
+def hash_function(data: str, m: int):
+    return int(hashlib.sha1(data.encode()).hexdigest(), 16) % (2 ** m)
 
 
 def _inbetween(k: int, start: int, end: int) -> bool:
