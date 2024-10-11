@@ -48,15 +48,14 @@ class ChordNodeReference:
     @property
     def successor(self) -> 'ChordNodeReference':
         response = self._send_data(GET_SUCCESSOR).decode().split(',')
-        if response:
+        if response[0] != '':
             return ChordNodeReference(response[1], self.port)
 
     # Property to get the predecessor of the current node
     @property
     def predecessor(self) -> 'ChordNodeReference':
-        logging.info(f'GET PREDECESSOR for {self.ip}:{self.port}')
         response = self._send_data(GET_PREDECESSOR).decode().split(',')
-        if response:
+        if response[0] != '':
             return ChordNodeReference(response[1], self.port)
 
     # Method to notify the current node about another node
