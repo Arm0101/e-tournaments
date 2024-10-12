@@ -1,5 +1,6 @@
 {
-    "tournament": "Eggyf2",
+    "tournament": "yony",
+    "type": "group_stage",
     "players": [
         {
             "name": "Abdel",
@@ -7,7 +8,7 @@
         },
         {
             "name": "Arian",
-            "score": 2
+            "score": 0
         },
         {
             "name": "deli",
@@ -15,14 +16,10 @@
         },
         {
             "name": "melissa",
-            "score": 1
+            "score": 0
         }
     ],
-    "winner": "Arian",
-    "games": [
-        "Abdel vs Arian - Ganador: Arian",
-        "deli vs melissa - Ganador: melissa",
-        "melissa vs Arian - Ganador: Arian"
-    ],
+    "winner": "Abdel",
+    "games": [],
     "completed": true
 }

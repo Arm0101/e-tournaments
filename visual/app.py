@@ -20,6 +20,27 @@ def load_tournaments():
 tournaments = load_tournaments()
 
 
+def start_round_robin(players):
+    games = []
+    for i in range(len(players)):
+        for j in range(i + 1, len(players)):
+            games.append((players[i], players[j]))
+
+    return games
+
+
+def start_group_stage(players, group_size=4):
+    random.shuffle(players)
+    groups = [players[i : i + group_size] for i in range(0, len(players), group_size)]
+
+    group_games = {}
+
+    for index, group in enumerate(groups):
+        group_games[f"Group {index + 1}"] = start_round_robin(group)
+
+    return group_games
+
+
 @app.route("/")
 def index():
     return render_template("index.html", tournaments=tournaments)
@@ -28,8 +49,10 @@ def index():
 @app.route("/create_tournament", methods=["POST"])
 def create_tournament():
     tournament_name = request.form["tournament_name"]
+    tournament_type = request.form["tournament_type"]  # New field for type
     if tournament_name not in tournaments:
         tournaments[tournament_name] = {
+            "type": tournament_type,
             "players": [],
             "games": [],
             "winner": None,
@@ -61,10 +84,11 @@ def start_tournament(tournament_name):
                 url_for("tournament", tournament_name=tournament_name)
             )  # No se puede iniciar con menos de 2 jugadores
 
-        while len(players) > 1:
-            random.shuffle(
-                players
-            )  # Mezclar los jugadores para emparejarlos aleatoriamente
+        if tournaments[tournament_name]["type"] == "elimination":
+            while len(players) > 1:
+                random.shuffle(
+                    players
+                )  # Mezclar los jugadores para emparejarlos aleatoriamente
             next_round = []
             for i in range(0, len(players), 2):
                 if i + 1 < len(players):  # Asegurarse de que haya un par
@@ -83,19 +107,27 @@ def start_tournament(tournament_name):
 
         final_winner = players[0]["name"]
         tournaments[tournament_name]["winner"] = final_winner
-        tournaments[tournament_name][
-            "completed"
-        ] = True  # Marcar torneo como completado
+        tournaments[tournament_name]["completed"] = True
 
-        # Almacenar resultados en un archivo JSON
-        save_results(tournament_name)
-        save_tournaments()
+    elif tournaments[tournament_name]["type"] == "round_robin":
+        games = start_round_robin(players)
+        tournaments[tournament_name]["games"].extend(games)
+    elif tournaments[tournament_name]["type"] == "group_stage":
+        group_games = start_group_stage(players)
+        tournaments[tournament_name]["games"].append(group_games)
+
+    # Mark tournament as completed if needed and save results.
+    tournaments[tournament_name]["completed"] = True
+    save_results(tournament_name)
+    save_tournaments()
+
     return redirect(url_for("tournament", tournament_name=tournament_name))
 
 
 def save_results(tournament_name):
     results = {
         "tournament": tournament_name,
+        "type": tournaments[tournament_name]["type"],  # Save tournament type
         "players": tournaments[tournament_name]["players"],
         "winner": tournaments[tournament_name]["winner"],
         "games": tournaments[tournament_name]["games"],

@@ -29,17 +29,19 @@
       <div class="card mb-4">
         <div class="card-body">
           <h2 class="card-title">Crear Torneo</h2>
-          <form action="/create_tournament" method="post">
-            <div class="form-group">
-              <input
-                type="text"
-                class="form-control"
-                name="tournament_name"
-                placeholder="Nombre del Torneo"
-                required
-              />
-            </div>
-            <button type="submit" class="btn btn-primary">Crear Torneo</button>
+          <form method="POST" action="{{ url_for('create_tournament') }}">
+            <input
+              type="text"
+              name="tournament_name"
+              placeholder="Tournament Name"
+              required
+            />
+            <select name="tournament_type">
+              <option value="elimination">Elimination</option>
+              <option value="round_robin">Round Robin</option>
+              <option value="group_stage">Group Stage</option>
+            </select>
+            <button type="submit">Create Tournament</button>
           </form>
         </div>
       </div>

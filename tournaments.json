@@ -1,0 +1,139 @@
+{
+    "Eggyf": {
+        "type": "group_stage",
+        "players": [
+            {
+                "name": "melissa",
+                "score": 0
+            },
+            {
+                "name": "Arian",
+                "score": 0
+            },
+            {
+                "name": "Abdel",
+                "score": 0
+            },
+            {
+                "name": "deli",
+                "score": 0
+            }
+        ],
+        "games": [
+            {
+                "Group 1": [
+                    [
+                        {
+                            "name": "melissa",
+                            "score": 0
+                        },
+                        {
+                            "name": "Arian",
+                            "score": 0
+                        }
+                    ],
+                    [
+                        {
+                            "name": "melissa",
+                            "score": 0
+                        },
+                        {
+                            "name": "Abdel",
+                            "score": 0
+                        }
+                    ],
+                    [
+                        {
+                            "name": "melissa",
+                            "score": 0
+                        },
+                        {
+                            "name": "deli",
+                            "score": 0
+                        }
+                    ],
+                    [
+                        {
+                            "name": "Arian",
+                            "score": 0
+                        },
+                        {
+                            "name": "Abdel",
+                            "score": 0
+                        }
+                    ],
+                    [
+                        {
+                            "name": "Arian",
+                            "score": 0
+                        },
+                        {
+                            "name": "deli",
+                            "score": 0
+                        }
+                    ],
+                    [
+                        {
+                            "name": "Abdel",
+                            "score": 0
+                        },
+                        {
+                            "name": "deli",
+                            "score": 0
+                        }
+                    ]
+                ]
+            }
+        ],
+        "winner": null,
+        "completed": true
+    },
+    "Eggyf2": {
+        "type": "round_robin",
+        "players": [
+            {
+                "name": "Abdel",
+                "score": 0
+            },
+            {
+                "name": "Arian",
+                "score": 0
+            },
+            {
+                "name": "deli",
+                "score": 0
+            },
+            {
+                "name": "melissa",
+                "score": 0
+            }
+        ],
+        "games": [],
+        "winner": "Abdel",
+        "completed": true
+    },
+    "yony": {
+        "type": "group_stage",
+        "players": [
+            {
+                "name": "Abdel",
+                "score": 0
+            },
+            {
+                "name": "Arian",
+                "score": 0
+            },
+            {
+                "name": "deli",
+                "score": 0
+            },
+            {
+                "name": "melissa",
+                "score": 0
+            }
+        ],
+        "games": [],
+        "winner": "Abdel",
+        "completed": true
+    }
+}
