@@ -1,6 +1,6 @@
 {
     "tournament": "yony",
-    "type": "group_stage",
+    "type": "elimination",
     "players": [
         {
             "name": "Abdel",
@@ -8,18 +8,22 @@
         },
         {
             "name": "Arian",
-            "score": 0
-        },
-        {
-            "name": "deli",
-            "score": 0
+            "score": 1
         },
         {
             "name": "melissa",
             "score": 0
+        },
+        {
+            "name": "deli",
+            "score": 2
         }
     ],
-    "winner": "Abdel",
-    "games": [],
+    "winner": "deli",
+    "games": [
+        "Abdel vs Arian - Winner: Arian",
+        "melissa vs deli - Winner: deli",
+        "Arian vs deli - Winner: deli"
+    ],
     "completed": true
 }

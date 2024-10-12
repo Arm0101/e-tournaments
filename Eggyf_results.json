@@ -1,0 +1,36 @@
+{
+    "tournament": "Eggyf",
+    "type": "round_robin",
+    "players": [
+        {
+            "name": "Abdel",
+            "score": 0
+        },
+        {
+            "name": "Arian",
+            "score": 0
+        },
+        {
+            "name": "deli",
+            "score": 0
+        },
+        {
+            "name": "melissa",
+            "score": 0
+        }
+    ],
+    "winner": [
+        "Abdel",
+        "Arian",
+        "deli"
+    ],
+    "games": [
+        "Abdel vs Arian - Winner: Arian",
+        "Abdel vs deli - Winner: Abdel",
+        "Abdel vs melissa - Winner: Abdel",
+        "Arian vs deli - Winner: deli",
+        "Arian vs melissa - Winner: Arian",
+        "deli vs melissa - Winner: deli"
+    ],
+    "completed": true
+}

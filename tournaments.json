@@ -1,94 +1,5 @@
 {
     "Eggyf": {
-        "type": "group_stage",
-        "players": [
-            {
-                "name": "melissa",
-                "score": 0
-            },
-            {
-                "name": "Arian",
-                "score": 0
-            },
-            {
-                "name": "Abdel",
-                "score": 0
-            },
-            {
-                "name": "deli",
-                "score": 0
-            }
-        ],
-        "games": [
-            {
-                "Group 1": [
-                    [
-                        {
-                            "name": "melissa",
-                            "score": 0
-                        },
-                        {
-                            "name": "Arian",
-                            "score": 0
-                        }
-                    ],
-                    [
-                        {
-                            "name": "melissa",
-                            "score": 0
-                        },
-                        {
-                            "name": "Abdel",
-                            "score": 0
-                        }
-                    ],
-                    [
-                        {
-                            "name": "melissa",
-                            "score": 0
-                        },
-                        {
-                            "name": "deli",
-                            "score": 0
-                        }
-                    ],
-                    [
-                        {
-                            "name": "Arian",
-                            "score": 0
-                        },
-                        {
-                            "name": "Abdel",
-                            "score": 0
-                        }
-                    ],
-                    [
-                        {
-                            "name": "Arian",
-                            "score": 0
-                        },
-                        {
-                            "name": "deli",
-                            "score": 0
-                        }
-                    ],
-                    [
-                        {
-                            "name": "Abdel",
-                            "score": 0
-                        },
-                        {
-                            "name": "deli",
-                            "score": 0
-                        }
-                    ]
-                ]
-            }
-        ],
-        "winner": null,
-        "completed": true
-    },
-    "Eggyf2": {
         "type": "round_robin",
         "players": [
             {
@@ -108,12 +19,23 @@
                 "score": 0
             }
         ],
-        "games": [],
-        "winner": "Abdel",
+        "games": [
+            "Abdel vs Arian - Winner: Arian",
+            "Abdel vs deli - Winner: Abdel",
+            "Abdel vs melissa - Winner: Abdel",
+            "Arian vs deli - Winner: deli",
+            "Arian vs melissa - Winner: Arian",
+            "deli vs melissa - Winner: deli"
+        ],
+        "winner": [
+            "Abdel",
+            "Arian",
+            "deli"
+        ],
         "completed": true
     },
     "yony": {
-        "type": "group_stage",
+        "type": "elimination",
         "players": [
             {
                 "name": "Abdel",
@@ -121,19 +43,57 @@
             },
             {
                 "name": "Arian",
-                "score": 0
-            },
-            {
-                "name": "deli",
-                "score": 0
+                "score": 1
             },
             {
                 "name": "melissa",
                 "score": 0
+            },
+            {
+                "name": "deli",
+                "score": 2
             }
         ],
-        "games": [],
-        "winner": "Abdel",
+        "games": [
+            "Abdel vs Arian - Winner: Arian",
+            "melissa vs deli - Winner: deli",
+            "Arian vs deli - Winner: deli"
+        ],
+        "winner": "deli",
+        "completed": true
+    },
+    "abdel": {
+        "type": "round_robin",
+        "players": [
+            {
+                "name": "Abdel",
+                "score": 1
+            },
+            {
+                "name": "Arian",
+                "score": 1
+            },
+            {
+                "name": "deli",
+                "score": 2
+            },
+            {
+                "name": "melissa",
+                "score": 2
+            }
+        ],
+        "games": [
+            "Abdel vs Arian - Winner: Arian",
+            "Abdel vs deli - Winner: deli",
+            "Abdel vs melissa - Winner: Abdel",
+            "Arian vs deli - Winner: deli",
+            "Arian vs melissa - Winner: melissa",
+            "deli vs melissa - Winner: melissa"
+        ],
+        "winner": [
+            "deli",
+            "melissa"
+        ],
         "completed": true
     }
 }

@@ -78,50 +78,89 @@ def start_tournament(tournament_name):
     if tournament_name in tournaments and not tournaments[tournament_name]["completed"]:
         players = tournaments[tournament_name]["players"]
 
-        # Simulación de partidos: elige un ganador aleatorio
         if len(players) < 2:
-            return redirect(
-                url_for("tournament", tournament_name=tournament_name)
-            )  # No se puede iniciar con menos de 2 jugadores
+            return redirect(url_for("tournament", tournament_name=tournament_name))
 
         if tournaments[tournament_name]["type"] == "elimination":
-            while len(players) > 1:
-                random.shuffle(
-                    players
-                )  # Mezclar los jugadores para emparejarlos aleatoriamente
-            next_round = []
-            for i in range(0, len(players), 2):
-                if i + 1 < len(players):  # Asegurarse de que haya un par
-                    winner = random.choice([players[i], players[i + 1]])
-                    winner["score"] += 1  # Incrementar el puntaje del ganador
-                    next_round.append(winner)
-                    tournaments[tournament_name]["games"].append(
-                        f"{players[i]['name']} vs {players[i + 1]['name']} - Ganador: {winner['name']}"
-                    )
-                else:
-                    next_round.append(
-                        players[i]
-                    )  # Jugador sin pareja avanza automáticamente
+            final_winner = simulate_elimination(players, tournament_name)
+            tournaments[tournament_name]["winner"] = final_winner
 
-            players = next_round
+        elif tournaments[tournament_name]["type"] == "round_robin":
+            final_winner = simulate_round_robin(players, tournament_name)
+            tournaments[tournament_name]["winner"] = final_winner
 
-        final_winner = players[0]["name"]
-        tournaments[tournament_name]["winner"] = final_winner
+        elif tournaments[tournament_name]["type"] == "group_stage":
+            groups = start_group_stage(players)  # Assume this function creates groups
+            group_winners = simulate_group_stage(groups, tournament_name)
+            tournaments[tournament_name]["winner"] = group_winners
+
+        # Mark tournament as completed and save results.
         tournaments[tournament_name]["completed"] = True
-
-    elif tournaments[tournament_name]["type"] == "round_robin":
-        games = start_round_robin(players)
-        tournaments[tournament_name]["games"].extend(games)
-    elif tournaments[tournament_name]["type"] == "group_stage":
-        group_games = start_group_stage(players)
-        tournaments[tournament_name]["games"].append(group_games)
-
-    # Mark tournament as completed if needed and save results.
-    tournaments[tournament_name]["completed"] = True
-    save_results(tournament_name)
-    save_tournaments()
+        save_results(tournament_name)  # Save detailed results
+        save_tournaments()  # Save overall tournament state
 
     return redirect(url_for("tournament", tournament_name=tournament_name))
+
+
+def simulate_elimination(players, tournament_name):
+    while len(players) > 1:
+        random.shuffle(players)  # Shuffle players for random pairing
+        next_round = []
+        for i in range(0, len(players), 2):
+            if i + 1 < len(players):  # Ensure there is a pair
+                winner = random.choice([players[i], players[i + 1]])
+                winner["score"] += 1  # Increment the winner's score
+                next_round.append(winner)
+                tournaments[tournament_name]["games"].append(
+                    f"{players[i]['name']} vs {players[i + 1]['name']} - Winner: {winner['name']}"
+                )
+            else:
+                next_round.append(
+                    players[i]
+                )  # Player without a pair advances automatically
+        players = next_round
+    return players[0]["name"]  # Return the final winner
+
+
+# Return the final winner
+
+
+def simulate_round_robin(players, tournament_name):
+    scores = {
+        player["name"]: player["score"] for player in players
+    }  # Initialize scores
+
+    for i in range(len(players)):
+        for j in range(i + 1, len(players)):
+            winner = random.choice([players[i], players[j]])
+            scores[winner["name"]] += 1
+
+            # Update individual player's score in the original list
+            for player in players:
+                if player["name"] == winner["name"]:
+                    player["score"] += 1
+
+            tournaments[tournament_name]["games"].append(
+                f"{players[i]['name']} vs {players[j]['name']} - Winner: {winner['name']}"
+            )
+
+    # Determine the overall winner based on scores
+    max_score = max(scores.values())
+    winners = [name for name, score in scores.items() if score == max_score]
+
+    return (
+        winners[0] if len(winners) == 1 else winners
+    )  # Return a single winner or list of winners
+
+
+def simulate_group_stage(groups):
+    group_winners = {}
+
+    for group_name, players in groups.items():
+        winner = simulate_round_robin(players)
+        group_winners[group_name] = winner
+
+    return group_winners
 
 
 def save_results(tournament_name):
