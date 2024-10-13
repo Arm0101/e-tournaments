@@ -95,5 +95,45 @@
             "melissa"
         ],
         "completed": true
+    },
+    "test01": {
+        "players": [
+            {
+                "name": "a",
+                "score": 1
+            },
+            {
+                "name": "b",
+                "score": 0
+            }
+        ],
+        "games": [
+            "a vs b - Ganador: a"
+        ],
+        "winner": "a",
+        "completed": true
+    },
+    "test02": {
+        "players": [
+            {
+                "name": "a",
+                "score": 0
+            },
+            {
+                "name": "b",
+                "score": 0
+            },
+            {
+                "name": "c",
+                "score": 0
+            },
+            {
+                "name": "d",
+                "score": 0
+            }
+        ],
+        "games": [],
+        "winner": "f",
+        "completed": true
     }
 }
