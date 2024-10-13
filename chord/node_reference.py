@@ -1,3 +1,4 @@
+import json
 import logging
 
 from .codes import *
@@ -27,6 +28,12 @@ class ChordNodeReference:
 
     def send_tournaments(self):
         return self._send_data(SEND_TOURNAMENTS)
+
+    def simulate_tournament(self, name):
+        return self._send_data(SIMULATE_TOURNAMENT, name)
+
+    def update_tournament_result(self, name, data):
+        return self._send_data(TOURNAMENT_RESULT, f'{name}|{json.dumps(data)}')
 
     def send_predecessor_data(self):
         return self._send_data(SEND_PREDECESSOR_DATA)

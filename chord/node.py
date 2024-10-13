@@ -7,7 +7,8 @@ from .codes import *
 from .node_reference import ChordNodeReference
 from .handler import Handler
 from .utils import hash_function, _inbetween
-
+from logic.tournament import TournamentSimulator
+import copy
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(threadName)s] %(levelname)s: %(message)s')
 BROADCAST_PORT = 9001
 TOURNAMENT_PORT = 9002
@@ -331,10 +332,31 @@ class ChordNode:
             logging.info(f'pred: {self.pred_data}, pred2: {self.pred2_data}')
             time.sleep(8)
 
+    def update_tournament_sim(self, name, data):
+        with self.lock:
+            logging.info(f'RESULT SIM {data}')
+            self.data[name] = data[name]
+
+    def _simulate_tournament(self, t_name):
+        logging.info(f'RUN TOURNAMENT {t_name} IN NODE: {self.id}')
+        if t_name in self.data:
+            t_data = copy.deepcopy(self.data[t_name])
+            sim = TournamentSimulator(t_name, t_data, self.ref)
+            sim.run_simulation()
+
+    def simulate_tournament(self, tournament_name):
+        key_hash = hash_function(tournament_name, self.m)
+        node = self.find_successor(key_hash)
+        if node:
+            node.simulate_tournament(tournament_name)
+
     def send(self, id, data):
-        self.store_key(id, data)
-        self.notify_tournament({'id': id, 'completed': data['completed']})
-        logging.info(f'{hash_function(id, self.m)}: {data} saved')
+        if data:
+            completed = data['completed']
+            data = json.dumps(data)
+            self.store_key(id, data)
+            self.notify_tournament({'id': id, 'completed': completed})
+            logging.info(f'{hash_function(id, self.m)}: {data} saved')
 
     def get(self, id):
         return self.retrieve_key(id)
@@ -431,6 +453,18 @@ class ChordNode:
 
                 elif option == SEND_TOURNAMENTS:
                     conn.sendall(json.dumps(self.tournaments).encode())
+                    conn.close()
+                elif option == SIMULATE_TOURNAMENT:
+                    t_name = data[1]
+                    conn.sendall(f'RUN TOURNAMENT {t_name}'.encode())
+                    self._simulate_tournament(t_name)
+                    conn.close()
+
+                elif option == TOURNAMENT_RESULT:
+                    t_name, t_data = _data.split('|')
+                    t_data = json.loads(t_data)
+                    t_name = key.split(',')[0]
+                    self.update_tournament_sim(t_name, t_data)
                     conn.close()
                 if data_resp:
                     response = f'{data_resp.id},{data_resp.ip}'.encode()
