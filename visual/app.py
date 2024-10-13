@@ -29,7 +29,7 @@ def start_round_robin(players):
     return games
 
 
-def start_group_stage(players, group_size=4):
+def start_group_stage(players, group_size=2):
     random.shuffle(players)
     groups = [players[i : i + group_size] for i in range(0, len(players), group_size)]
 
@@ -148,16 +148,15 @@ def simulate_round_robin(players, tournament_name):
     max_score = max(scores.values())
     winners = [name for name, score in scores.items() if score == max_score]
 
-    return (
-        winners[0] if len(winners) == 1 else winners
-    )  # Return a single winner or list of winners
+    return winners[0] if len(winners) == 1 else winners
+    # Return a single winner or list of winners
 
 
-def simulate_group_stage(groups):
+def simulate_group_stage(groups, tournament_name):
     group_winners = {}
 
     for group_name, players in groups.items():
-        winner = simulate_round_robin(players)
+        winner = simulate_round_robin(players, tournament_name)
         group_winners[group_name] = winner
 
     return group_winners
