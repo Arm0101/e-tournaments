@@ -9,6 +9,7 @@ from .handler import Handler
 from .utils import hash_function, _inbetween
 from logic.tournament import TournamentSimulator
 import copy
+
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(threadName)s] %(levelname)s: %(message)s')
 BROADCAST_PORT = 9001
 TOURNAMENT_PORT = 9002
@@ -44,6 +45,7 @@ class ChordNode:
         threading.Thread(target=self.get_data_from_predecessors, daemon=True).start()
         threading.Thread(target=self.update_data, daemon=True).start()
         self.send_broadcast_join()
+        self.set_tournaments_from_data()
 
     def handle_join(self, node_id: int, node_ip: str, node_port: int):
         logging.info(f"Handle JOIN of {node_id}: {node_port}")
@@ -133,7 +135,7 @@ class ChordNode:
                         for t in self.tournaments:
                             if t['id'] == tournament['id']:
                                 exists = True
-                                t['completed'] = tournament['completed']
+                                t['completed'] = True if tournament['completed'] else t['completed']
                         if not exists:
                             self.tournaments.append(tournament)
 
@@ -155,6 +157,10 @@ class ChordNode:
         logging.info(f"SEND JOIN broadcast from {self.id}")
 
         sock.close()
+
+    def set_tournaments_from_data(self):
+        for key, value in self.data.items():
+            self.notify_tournament({'id': key, 'completed': value['completed']})
 
     def update_successor(self, node: 'ChordNodeReference'):
         self.successor = node
@@ -183,18 +189,6 @@ class ChordNode:
             if self.finger[i] and _inbetween(self.finger[i].id, self.id, id):
                 return self.finger[i]
         return self.ref
-
-    # Method to join a Chord network using 'node' as an entry point
-    def join(self, node: 'ChordNodeReference'):
-        if node:
-            self.predecessor = None
-            self.successor = node.find_successor(self.id)
-            logging.info(f'in join: successor of {self.ref} is {self.successor} ')
-
-            self.successor.notify(self.ref)
-        else:
-            self.successor = self.ref
-            self.predecessor = None
 
     # Stabilize method to periodically verify and update the successor and predecessor
     def stabilize(self):
@@ -336,6 +330,7 @@ class ChordNode:
         with self.lock:
             logging.info(f'RESULT SIM {data}')
             self.data[name] = data[name]
+            self.notify_tournament({'id': name, 'completed': data[name]['completed']})
 
     def _simulate_tournament(self, t_name):
         logging.info(f'RUN TOURNAMENT {t_name} IN NODE: {self.id}')
