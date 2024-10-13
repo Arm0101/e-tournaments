@@ -1,7 +1,12 @@
 {
     "Eggyf": {
         "type": "elimination",
-        "players": [],
+        "players": [
+            {
+                "name": "Abdel",
+                "score": 0
+            }
+        ],
         "games": [],
         "winner": null,
         "completed": false

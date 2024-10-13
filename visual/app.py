@@ -49,7 +49,7 @@ def index():
 @app.route("/create_tournament", methods=["POST"])
 def create_tournament():
     tournament_name = request.form["tournament_name"]
-    tournament_type = request.form["tournament_type"]  # New field for type
+    tournament_type = request.form["tournament_type"]
     if tournament_name not in tournaments:
         tournaments[tournament_name] = {
             "type": tournament_type,
