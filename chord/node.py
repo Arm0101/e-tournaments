@@ -345,6 +345,7 @@ class ChordNode:
             sim.run_simulation()
 
     def simulate_tournament(self, tournament_name):
+        logging.info('SIMULATING')
         key_hash = hash_function(tournament_name, self.m)
         node = self.find_successor(key_hash)
         if node:

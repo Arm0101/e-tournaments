@@ -106,7 +106,7 @@ def index():
 @app.route("/tournament/<tournament_name>")
 def tournament(tournament_name):
     _tournament = node.get(tournament_name)
-    _tournament = json.loads(_tournament)
+    _tournament = json.loads(_tournament) if len(_tournament) > 0 else {}
     _tournament_to_render = {'data': _tournament}
     return render_template(
         "tournament.html", tournament=_tournament_to_render, name=tournament_name
@@ -143,9 +143,7 @@ def create_tournament():
 
 @app.route("/start_tournament/<tournament_name>", methods=["POST"])
 def start_tournament(tournament_name):
-    if tournament_name in tournaments:
-        node.simulate_tournament(tournament_name)
-
+    node.simulate_tournament(tournament_name)
     return redirect(url_for("tournament", tournament_name=tournament_name))
 
 
