@@ -25,6 +25,9 @@ class ChordNodeReference:
             logging.error(f"Error sending data: {e}")
             return b''
 
+    def send_tournaments(self):
+        return self._send_data(SEND_TOURNAMENTS)
+
     def send_predecessor_data(self):
         return self._send_data(SEND_PREDECESSOR_DATA)
 
@@ -73,7 +76,7 @@ class ChordNodeReference:
 
     # Method to store a key-value pair in the current node
     def store_key(self, key: str, value: str):
-        self._send_data(STORE_KEY, f'{key},{value}')
+        self._send_data(STORE_KEY, f'{key}|{value}')
 
     # Method to retrieve a value for a given key from the current node
     def retrieve_key(self, key: str) -> str:

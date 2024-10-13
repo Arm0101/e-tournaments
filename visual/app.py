@@ -2,22 +2,23 @@ from flask import Flask, render_template, request, redirect, url_for
 import random
 import json
 import os
-
+from chord.node import ChordNode
+import socket
 app = Flask(__name__)
 
 # Estructura de datos para almacenar torneos y jugadores
 tournaments = {}
-
+node = None
 
 # Cargar torneos desde un archivo JSON al iniciar la aplicación
-def load_tournaments():
-    if os.path.exists("tournaments.json"):
-        with open("tournaments.json", "r") as f:
-            return json.load(f)
-    return {}
-
-
-tournaments = load_tournaments()
+# def load_tournaments():
+#     if os.path.exists("tournaments.json"):
+#         with open("tournaments.json", "r") as f:
+#             return json.load(f)
+#     return {}
+#
+#
+# tournaments = load_tournaments()
 
 
 def start_round_robin(players):
@@ -31,7 +32,7 @@ def start_round_robin(players):
 
 def start_group_stage(players, group_size=4):
     random.shuffle(players)
-    groups = [players[i : i + group_size] for i in range(0, len(players), group_size)]
+    groups = [players[i: i + group_size] for i in range(0, len(players), group_size)]
 
     group_games = {}
 
@@ -43,7 +44,13 @@ def start_group_stage(players, group_size=4):
 
 @app.route("/")
 def index():
-    return render_template("index.html", tournaments=tournaments)
+    _tournaments = node.get_tournaments().decode()
+    _tournaments = json.loads(_tournaments)
+    _tournaments = _tournaments if len(_tournaments) > 0 else {}
+    _tournaments_to_render = {}
+    for t in _tournaments:
+        _tournaments_to_render[t['id']] = {'data': {'completed': t['completed']}}
+    return render_template("index.html", tournaments=_tournaments_to_render)
 
 
 @app.route("/create_tournament", methods=["POST"])
@@ -58,18 +65,20 @@ def create_tournament():
             "winner": None,
             "completed": False,
         }
-        save_tournaments()
+
+    for t in tournaments:
+        node.send(t, tournaments[t])
     return redirect(url_for("index"))
 
 
 @app.route("/add_player/<tournament_name>", methods=["POST"])
 def add_player(tournament_name):
     player_name = request.form["player_name"]
-    if tournament_name in tournaments and not tournaments[tournament_name]["completed"]:
-        tournaments[tournament_name]["players"].append(
-            {"name": player_name, "score": 0}
-        )
-        save_tournaments()  # Guardar cambios después de agregar un jugador
+    _tournament = node.get(tournament_name)
+    _tournament = json.loads(_tournament)
+    if _tournament and not _tournament["completed"]:
+        _tournament['players'].append({"name": player_name, "score": 0})
+    node.send(tournament_name, _tournament)
     return redirect(url_for("tournament", tournament_name=tournament_name))
 
 
@@ -127,7 +136,7 @@ def simulate_elimination(players, tournament_name):
 
 def simulate_round_robin(players, tournament_name):
     scores = {
-        player["name"]: player["score"] for player in players
+        player["name"]: player["score"] for player in players[0]
     }  # Initialize scores
 
     for i in range(len(players)):
@@ -148,16 +157,15 @@ def simulate_round_robin(players, tournament_name):
     max_score = max(scores.values())
     winners = [name for name, score in scores.items() if score == max_score]
 
-    return (
-        winners[0] if len(winners) == 1 else winners
-    )  # Return a single winner or list of winners
+    return winners[0] if len(winners) == 1 else winners
+    # Return a single winner or list of winners
 
 
-def simulate_group_stage(groups):
+def simulate_group_stage(groups, tournament_name):
     group_winners = {}
 
     for group_name, players in groups.items():
-        winner = simulate_round_robin(players)
+        winner = simulate_round_robin(players, tournament_name)
         group_winners[group_name] = winner
 
     return group_winners
@@ -185,6 +193,7 @@ def save_tournaments():
 @app.route("/set_winner/<tournament_name>", methods=["POST"])
 def set_winner(tournament_name):
     winner_name = request.form["winner_name"]
+    _tournament = node.get(tournament_name).decode()
     if tournament_name in tournaments and not tournaments[tournament_name]["completed"]:
         tournaments[tournament_name]["winner"] = winner_name
         tournaments[tournament_name][
@@ -197,11 +206,19 @@ def set_winner(tournament_name):
 
 @app.route("/tournament/<tournament_name>")
 def tournament(tournament_name):
-    tournament_data = tournaments.get(tournament_name)
+    _tournament = node.get(tournament_name)
+    _tournament = json.loads(_tournament)
+    _tournament_to_render = {'data': _tournament}
     return render_template(
-        "tournament.html", tournament=tournament_data, name=tournament_name
+        "tournament.html", tournament=_tournament_to_render, name=tournament_name
     )
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    ip = socket.gethostbyname(socket.gethostname())
+    node = ChordNode(ip)
+    app.run(debug=False, host=ip, port=5001)
+
+    while True:
+        pass
+

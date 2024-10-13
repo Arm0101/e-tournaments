@@ -14,7 +14,7 @@
 
       <h2>Jugadores</h2>
       <ul class="list-group mb-4">
-        {% for player in tournament.players %}
+        {% for player in tournament.data.players %}
         <li
           class="list-group-item d-flex justify-content-between align-items-center"
         >
@@ -44,19 +44,6 @@
         <button type="submit" class="btn btn-primary">Iniciar Torneo</button>
       </form>
 
-      <h2>Registrar Ganador</h2>
-      <form action="/set_winner/{{ name }}" method="post" class="mb-4">
-        <div class="form-group">
-          <input
-            type="text"
-            class="form-control"
-            name="winner_name"
-            placeholder="Nombre del Ganador"
-            required
-          />
-        </div>
-        <button type="submit" class="btn btn-danger">Establecer Ganador</button>
-      </form>
       {% else %}
       <h3>Ganador del Torneo: {{ tournament.winner }}</h3>
       <p class="text-success">Este torneo ha sido completado.</p>

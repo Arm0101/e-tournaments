@@ -10,6 +10,7 @@ from .utils import hash_function, _inbetween
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(threadName)s] %(levelname)s: %(message)s')
 BROADCAST_PORT = 9001
+TOURNAMENT_PORT = 9002
 
 
 class ChordNode:
@@ -30,16 +31,17 @@ class ChordNode:
         self.pred_data = {}
         self.pred2_data = {}
         self.lock = threading.Lock()
+        self.tournaments = []
 
         # Start background threads for stabilization, fixing fingers, and checking predecessor
         threading.Thread(target=self.listen_for_broadcast, daemon=True).start()
+        threading.Thread(target=self.recv_tournament, daemon=True).start()
         threading.Thread(target=self.stabilize, daemon=True).start()  # Start stabilize thread
         threading.Thread(target=self.fix_fingers, daemon=True).start()  # Start fix fingers thread
         threading.Thread(target=self.check_predecessor, daemon=True).start()  # Start check predecessor thread
         threading.Thread(target=self.start_server, daemon=True).start()  # Start server thread
         threading.Thread(target=self.get_data_from_predecessors, daemon=True).start()
         threading.Thread(target=self.update_data, daemon=True).start()
-
         self.send_broadcast_join()
 
     def handle_join(self, node_id: int, node_ip: str, node_port: int):
@@ -82,7 +84,6 @@ class ChordNode:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(('', BROADCAST_PORT))
-
         logging.info(f"Listen port: {BROADCAST_PORT}")
 
         while True:
@@ -97,6 +98,51 @@ class ChordNode:
                 logging.info(f"RECV JOIN from {node_id}  ({node_ip}:{node_port})")
 
                 self.handle_join(node_id, node_ip, node_port)
+
+    def notify_tournament(self, tournament):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        tournament_json = json.dumps(tournament)
+        message = f"TOURNAMENT|{tournament_json}".encode('utf-8')
+
+        sock.sendto(message, ('255.255.255.255', TOURNAMENT_PORT))
+        logging.info(f"Notify tournament {tournament}")
+
+        sock.close()
+
+    def recv_tournament(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.bind(('', TOURNAMENT_PORT))
+        logging.info(f"Listening on tournament port: {TOURNAMENT_PORT}")
+
+        while True:
+            try:
+                data, addr = sock.recvfrom(1024)
+                message = data.decode('utf-8').split('|')
+
+                if message[0] == "TOURNAMENT":
+                    tournament = message[1]
+                    if tournament:
+                        tournament = json.loads(tournament)
+                        logging.info(f"Received tournament: {tournament}")
+                        exists = False
+                        for t in self.tournaments:
+                            if t['id'] == tournament['id']:
+                                exists = True
+                                t['completed'] = tournament['completed']
+                        if not exists:
+                            self.tournaments.append(tournament)
+
+            except json.JSONDecodeError as e:
+                logging.error(f"Error decoding JSON: {e}")
+            except Exception as e:
+                logging.error(f"Error receiving tournament: {e}")
+
+    def get_tournaments(self):
+        return self.ref.send_tournaments()
 
     def send_broadcast_join(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -287,6 +333,7 @@ class ChordNode:
 
     def send(self, id, data):
         self.store_key(id, data)
+        self.notify_tournament({'id': id, 'completed': data['completed']})
         logging.info(f'{hash_function(id, self.m)}: {data} saved')
 
     def get(self, id):
@@ -324,9 +371,9 @@ class ChordNode:
             while True:
                 conn, addr = s.accept()
                 logging.info(f'new connection from {addr}')
-                data = conn.recv(1024).decode()
-                logging.info(f'data: {data}')
-                data = data.split(',')
+                _data = conn.recv(1024).decode()
+                logging.info(f'data: {_data}')
+                data = _data.split(',')
                 data_resp = None
                 option = int(data[0])
 
@@ -356,14 +403,18 @@ class ChordNode:
                     if id and id != 'None':
                         data_resp = self.closest_preceding_finger(id)
                 elif option == STORE_KEY:
-                    key, value = data[1], data[2]
+                    key, value = _data.split('|')
+                    value = value.replace("'", '"').replace("None", "null").replace("False", "false").replace("True",
+                                                                                                              "true")
+                    value = json.loads(value)
+                    key = key.split(',')[1]
                     if key and value and key != 'None' and value != 'None':
                         self.data[key] = value
                 elif option == RETRIEVE_KEY:
                     key = data[1]
                     if key and key != 'None':
                         resp = self.data.get(key, '')
-                        conn.sendall(resp.encode())
+                        conn.sendall(json.dumps(resp).encode())
                         conn.close()
                 elif option == UPDATE_SUCCESSOR:
                     _ip = data[2]
@@ -376,6 +427,10 @@ class ChordNode:
                 elif option == SEND_PREDECESSOR_DATA:
                     # _data = {'id': self.id, 'ip': self.ip, 'port': self.port}
                     conn.sendall(json.dumps(self.data).encode())
+                    conn.close()
+
+                elif option == SEND_TOURNAMENTS:
+                    conn.sendall(json.dumps(self.tournaments).encode())
                     conn.close()
                 if data_resp:
                     response = f'{data_resp.id},{data_resp.ip}'.encode()
