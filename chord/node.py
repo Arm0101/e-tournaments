@@ -26,7 +26,7 @@ class ChordNode:
         self.m = m
         self.finger = [self.ref] * self.m
         self.next = 0  # Finger table index to fix next
-        self.data = {}  # Dictionary to store key-value pairs
+        self.data = self.handler.initial_data()
         self.pred_data = {}
         self.pred2_data = {}
         self.lock = threading.Lock()
@@ -38,6 +38,8 @@ class ChordNode:
         threading.Thread(target=self.check_predecessor, daemon=True).start()  # Start check predecessor thread
         threading.Thread(target=self.start_server, daemon=True).start()  # Start server thread
         threading.Thread(target=self.get_data_from_predecessors, daemon=True).start()
+        threading.Thread(target=self.update_data, daemon=True).start()
+
         self.send_broadcast_join()
 
     def handle_join(self, node_id: int, node_ip: str, node_port: int):
@@ -47,23 +49,26 @@ class ChordNode:
         time.sleep(2)
         if node_id != self.id:
             if self.predecessor is None and self.id == self.successor.id:
-                self.predecessor = new_node_ref
-                self.predecessor2 = self.ref
-                self.predecessor3 = new_node_ref
-                self.predecessor.update_successor(self.ref)
+                with self.lock:
+                    self.predecessor = new_node_ref
+                    self.predecessor2 = self.ref
+                    self.predecessor3 = new_node_ref
+                    self.predecessor.update_successor(self.ref)
                 logging.info(f"Update predecessor to {self.predecessor}")
 
                 if new_node_ref.id > self.predecessor.id:
-                    self.successor = new_node_ref
-                    self.successor.notify(self.ref)
+                    with self.lock:
+                        self.successor = new_node_ref
+                        self.successor.notify(self.ref)
                     logging.info(f"Update successor to {self.successor}")
 
             if self.predecessor and _inbetween(node_id, self.predecessor.id, self.id):
-                self.predecessor.update_successor(new_node_ref)
-                self.predecessor = new_node_ref
-                self.predecessor.update_successor(self.ref)
-                self.predecessor2 = self.predecessor.predecessor if self.predecessor else None
-                self.predecessor3 = self.predecessor2.predecessor if self.predecessor2 else None
+                with self.lock:
+                    self.predecessor.update_successor(new_node_ref)
+                    self.predecessor = new_node_ref
+                    self.predecessor.update_successor(self.ref)
+                    self.predecessor2 = self.predecessor.predecessor if self.predecessor else None
+                    self.predecessor3 = self.predecessor2.predecessor if self.predecessor2 else None
                 logging.info(f"Update predecessor to {self.predecessor}")
 
             if _inbetween(node_id, self.id, self.successor.id):
@@ -188,6 +193,13 @@ class ChordNode:
                 logging.error(f"Error in fix_fingers: {e}")
             time.sleep(5)
 
+    def dist_data(self, data: dict):
+        if not data:
+            return
+        logging.info(f'dist_data {self.data}')
+        for key, value in list(data.items()):
+            self.data[key] = value
+
     # Check predecessor method to periodically verify if the predecessor is alive
     def check_predecessor(self):
         while True:
@@ -201,7 +213,7 @@ class ChordNode:
                     logging.info(f'resp from: {self.predecessor} is {resp}')
                     if resp == b'':
                         logging.info('pred1 is dead')
-
+                        self.dist_data(self.pred_data)
                         if self.predecessor2.id == self.id:
                             self.predecessor = None
                             self.predecessor2 = None
@@ -212,6 +224,7 @@ class ChordNode:
                         resp = self.predecessor2.check()
                         if resp == b'':
                             logging.info('pred2 is dead')
+                            self.dist_data(self.pred2_data)
                             if self.predecessor3:
                                 if self.predecessor3.id == self.id:
                                     self.predecessor = None
@@ -244,7 +257,7 @@ class ChordNode:
         key_hash = hash_function(key, self.m)
         node = self.find_successor(key_hash)
         node.store_key(key, value)
-        self.data[key] = value  # Store in the current node
+        # self.data[key] = value  # Store in the current node
         # self.successor.store_key(key, value)  # Replicate to the successor
 
     # Retrieve key method to get a value for a given key
@@ -280,14 +293,25 @@ class ChordNode:
         return self.retrieve_key(id)
 
     def update_data(self):
-        for key, value in self.data.items():
-            key_hash = hash_function(key, self.m)
-            node = self.find_successor(key_hash)
+        while True:
+            logging.info(f'my data is {self.data}')
 
-            if node.id != self.id:
-                node.store_key(key, value)
-                # remove from node
-                self.data.pop(key)
+            with self.lock:
+                try:
+                    for key, value in list(self.data.items()):
+                        key_hash = hash_function(key, self.m)
+                        node = self.find_successor(key_hash)
+                        logging.info(f'update data: {key_hash} -> {node.id if node else ''}')
+
+                        if node and node.id != self.id:
+                            node.store_key(key, value)
+                            # remove from current node
+                            self.data.pop(key)
+
+                    self.handler.create(self.id, self.data)
+                except Exception as e:
+                    logging.error(f"Error in update_data")
+            time.sleep(10)
 
     # Start server method to handle incoming requests
     def start_server(self):
@@ -350,8 +374,8 @@ class ChordNode:
                     if _ip and _ip != 'None':
                         self.update_predecessor(ChordNodeReference(_ip, self.port))
                 elif option == SEND_PREDECESSOR_DATA:
-                    _data = {'id': self.id, 'ip': self.ip, 'port': self.port}
-                    conn.sendall(json.dumps(_data).encode())
+                    # _data = {'id': self.id, 'ip': self.ip, 'port': self.port}
+                    conn.sendall(json.dumps(self.data).encode())
                     conn.close()
                 if data_resp:
                     response = f'{data_resp.id},{data_resp.ip}'.encode()

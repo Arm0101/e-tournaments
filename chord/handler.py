@@ -1,8 +1,9 @@
+import logging
 import os
 
 current_dir = os.getcwd()
 db_path = os.path.join(os.path.dirname(__file__), '../db')
-import pickle
+import json
 
 
 class Handler:
@@ -14,10 +15,16 @@ class Handler:
         if not os.path.exists(self.db_folder):
             os.makedirs(self.db_folder)
 
-    def data(self):
-        return f'Send data from : {self.id}'
+    def initial_data(self):
+        file = os.path.join(self.db_folder, f"{self.id}.json")
+        if os.path.isfile(file):
+            with open(file, 'r') as archivo:
+                return json.load(archivo)
+        return {}
 
     def create(self, id, data):
-        folder = os.path.join(self.db_folder, str(id))
-        if not os.path.exists(folder):
-            os.makedirs(folder)
+        json_file = os.path.join(self.db_folder, f"{id}.json")
+        with open(json_file, 'w') as file:
+            json.dump(data, file)
+
+        logging.info(f'data created in file {json_file}')
