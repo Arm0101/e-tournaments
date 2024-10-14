@@ -33,11 +33,12 @@ class ChordNode:
         self.pred_data = {}
         self.pred2_data = {}
         self.lock = threading.Lock()
-        self.tournaments = []
+        self.tournaments = {}
 
         # Start background threads for stabilization, fixing fingers, and checking predecessor
         threading.Thread(target=self.listen_for_broadcast, daemon=True).start()
         threading.Thread(target=self.recv_tournament, daemon=True).start()
+        threading.Thread(target=self.notify_tournament, daemon=True).start()
         threading.Thread(target=self.stabilize, daemon=True).start()  # Start stabilize thread
         threading.Thread(target=self.fix_fingers, daemon=True).start()  # Start fix fingers thread
         threading.Thread(target=self.check_predecessor, daemon=True).start()  # Start check predecessor thread
@@ -45,7 +46,6 @@ class ChordNode:
         threading.Thread(target=self.get_data_from_predecessors, daemon=True).start()
         threading.Thread(target=self.update_data, daemon=True).start()
         self.send_broadcast_join()
-        self.set_tournaments_from_data()
 
     def handle_join(self, node_id: int, node_ip: str, node_port: int):
         logging.info(f"Handle JOIN of {node_id}: {node_port}")
@@ -102,17 +102,19 @@ class ChordNode:
 
                 self.handle_join(node_id, node_ip, node_port)
 
-    def notify_tournament(self, tournament):
+    def notify_tournament(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        tournament_json = json.dumps(tournament)
-        message = f"TOURNAMENT|{tournament_json}".encode('utf-8')
-
-        sock.sendto(message, ('255.255.255.255', TOURNAMENT_PORT))
-        logging.info(f"Notify tournament {tournament}")
-
-        sock.close()
+        while True:
+            _tournaments = []
+            for key, value in self.data.items():
+                _tournaments.append({'id': key, 'completed': value['completed']})
+            _tournaments = json.dumps(_tournaments)
+            message = f"TOURNAMENT|{_tournaments}".encode('utf-8')
+            sock.sendto(message, ('255.255.255.255', TOURNAMENT_PORT))
+            logging.info(f"Notify tournaments {_tournaments}")
+            time.sleep(2)
 
     def recv_tournament(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -126,18 +128,21 @@ class ChordNode:
                 data, addr = sock.recvfrom(1024)
                 message = data.decode('utf-8').split('|')
 
-                if message[0] == "TOURNAMENT":
-                    tournament = message[1]
-                    if tournament:
-                        tournament = json.loads(tournament)
-                        logging.info(f"Received tournament: {tournament}")
-                        exists = False
-                        for t in self.tournaments:
-                            if t['id'] == tournament['id']:
-                                exists = True
-                                t['completed'] = True if tournament['completed'] else t['completed']
-                        if not exists:
-                            self.tournaments.append(tournament)
+                if not message[0] == "TOURNAMENT":
+                    continue
+
+                _tournaments = message[1]
+                tournaments = json.loads(_tournaments)
+
+                if len(tournaments) == 0:
+                    continue
+
+                logging.info(f"Received tournaments: {tournaments}")
+                for tournament in tournaments:
+                    if tournament['id'] in self.tournaments and tournament['completed']:
+                        self.tournaments[tournament['id']] = tournament['completed']
+                    else:
+                        self.tournaments[tournament['id']] = tournament['completed']
 
             except json.JSONDecodeError as e:
                 logging.error(f"Error decoding JSON: {e}")
@@ -158,10 +163,6 @@ class ChordNode:
 
         sock.close()
 
-    def set_tournaments_from_data(self):
-        for key, value in self.data.items():
-            self.notify_tournament({'id': key, 'completed': value['completed']})
-
     def update_successor(self, node: 'ChordNodeReference'):
         self.successor = node
 
@@ -177,11 +178,14 @@ class ChordNode:
     # Method to find the predecessor of a given id
     def find_predecessor(self, id: int) -> 'ChordNodeReference':
         node = self
-        while not _inbetween(id, node.id, node.successor.id):
-            node = node.closest_preceding_finger(id)
-        if isinstance(node, ChordNodeReference):
-            return node
-        return node.ref
+        try:
+            while not _inbetween(id, node.id, node.successor.id):
+                node = node.closest_preceding_finger(id)
+            if isinstance(node, ChordNodeReference):
+                return node
+            return node.ref
+        except Exception as e:
+            return self.ref
 
     # Method to find the closest preceding finger of a given id
     def closest_preceding_finger(self, id: int) -> 'ChordNodeReference':
@@ -312,16 +316,16 @@ class ChordNode:
 
             if self.predecessor:
                 _pred_data = self.predecessor.send_predecessor_data().decode()
+                logging.info(f'Saving pred data {_pred_data}')
+
                 if _pred_data:
                     self.pred_data = json.loads(_pred_data)
 
             if self.predecessor2:
-                if self.id != self.predecessor2.id:
-                    self.pred2_data = ''
-
-                    _pred2_data = self.predecessor2.send_predecessor_data().decode()
-                    if _pred2_data:
-                        self.pred2_data = json.loads(_pred2_data)
+                _pred2_data = self.predecessor2.send_predecessor_data().decode()
+                logging.info(f'Saving pred2 data {_pred2_data}')
+                if _pred2_data:
+                    self.pred2_data = json.loads(_pred2_data)
 
             logging.info(f'pred: {self.pred_data}, pred2: {self.pred2_data}')
             time.sleep(8)
@@ -330,7 +334,8 @@ class ChordNode:
         with self.lock:
             logging.info(f'RESULT SIM {data}')
             self.data[name] = data[name]
-            self.notify_tournament({'id': name, 'completed': data[name]['completed']})
+            if name in self.tournaments:
+                self.tournaments[name] = data[name]['completed']
 
     def _simulate_tournament(self, t_name):
         logging.info(f'RUN TOURNAMENT {t_name} IN NODE: {self.id}')
@@ -348,10 +353,9 @@ class ChordNode:
 
     def send(self, id, data):
         if data:
-            completed = data['completed']
-            data = json.dumps(data)
-            self.store_key(id, data)
-            self.notify_tournament({'id': id, 'completed': completed})
+            _data = json.dumps(data)
+            self.store_key(id, _data)
+            self.tournaments[id] = data['completed']
             logging.info(f'{hash_function(id, self.m)}: {data} saved')
 
     def get(self, id):
@@ -361,21 +365,19 @@ class ChordNode:
         while True:
             logging.info(f'my data is {self.data}')
 
-            with self.lock:
-                try:
-                    for key, value in list(self.data.items()):
-                        key_hash = hash_function(key, self.m)
-                        node = self.find_successor(key_hash)
-                        logging.info(f'update data: {key_hash} -> {node.id if node else ''}')
+            try:
+                for key, value in list(self.data.items()):
+                    key_hash = hash_function(key, self.m)
+                    node = self.find_successor(key_hash)
+                    logging.info(f'update data: {key_hash} -> {node.id if node else ''}')
 
-                        if node and node.id != self.id:
-                            node.store_key(key, value)
-                            # remove from current node
-                            self.data.pop(key)
-
-                    self.handler.create(self.id, self.data)
-                except Exception as e:
-                    logging.error(f"Error in update_data")
+                    if node and node.id != self.id:
+                        node.store_key(key, value)
+                        # remove from current node
+                        self.data.pop(key)
+                self.handler.create(self.id, self.data)
+            except Exception as e:
+                logging.error(f"Error in update_data")
             time.sleep(10)
 
     # Start server method to handle incoming requests

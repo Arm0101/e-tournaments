@@ -94,12 +94,11 @@ def simulate_group_stage(groups, tournament_name):
 
 @app.route("/")
 def index():
-    _tournaments = node.get_tournaments().decode()
+    _tournaments = node.get_tournaments()
     _tournaments = json.loads(_tournaments)
-    _tournaments = _tournaments if len(_tournaments) > 0 else {}
     _tournaments_to_render = {}
-    for t in _tournaments:
-        _tournaments_to_render[t['id']] = {'data': {'completed': t['completed']}}
+    for key, value in _tournaments.items():
+        _tournaments_to_render[key] = {'data': {'completed': value}}
     return render_template("index.html", tournaments=_tournaments_to_render)
 
 
