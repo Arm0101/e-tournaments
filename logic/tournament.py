@@ -61,6 +61,9 @@ class TournamentSimulator:
                     player["active"] = player in next_round
             logging.info('updating tournament result')
             self.node.update_tournament_result(self.tournament_id, self.data_t)
+
+            if len([p for p in players if p['active']]) < 2:
+                continue
             time.sleep(10)
 
     def run_simulation(self):
