@@ -20,7 +20,7 @@ def start_round_robin(players):
     return games
 
 
-def start_group_stage(players, group_size=4):
+def start_group_stage(players, group_size=2):
     random.shuffle(players)
     groups = [players[i: i + group_size] for i in range(0, len(players), group_size)]
 
@@ -30,6 +30,8 @@ def start_group_stage(players, group_size=4):
         group_games[f"Group {index + 1}"] = start_round_robin(group)
 
     return group_games
+
+
 
 
 def simulate_elimination(players, tournament_name):
