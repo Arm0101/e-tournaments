@@ -38,8 +38,8 @@
             />
             <select class="custom-select-sm" name="tournament_type">
               <option value="elimination">Elimination</option>
-              <option value="round_robin">Round Robin</option>
-              <option value="group_stage">Group Stage</option>
+<!--              <option value="round_robin">Round Robin</option>-->
+<!--              <option value="group_stage">Group Stage</option>-->
             </select>
             <button class="btn btn-dark" type="submit">
               Create Tournament
@@ -60,7 +60,7 @@
             >{{ name }}</a
           >
 
-          {% if data.completed %}
+          {% if data.data.completed%}
           <span class="badge badge-success">Completado</span>
           {% else %}
           <span class="badge badge-warning">Activo</span>

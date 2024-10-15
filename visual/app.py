@@ -4,21 +4,11 @@ import json
 import os
 from chord.node import ChordNode
 import socket
+
 app = Flask(__name__)
 
-# Estructura de datos para almacenar torneos y jugadores
-tournaments = {}
+tournaments = []
 node = None
-
-# Cargar torneos desde un archivo JSON al iniciar la aplicación
-# def load_tournaments():
-#     if os.path.exists("tournaments.json"):
-#         with open("tournaments.json", "r") as f:
-#             return json.load(f)
-#     return {}
-#
-#
-# tournaments = load_tournaments()
 
 
 def start_round_robin(players):
@@ -42,73 +32,6 @@ def start_group_stage(players, group_size=2):
     return group_games
 
 
-@app.route("/")
-def index():
-    _tournaments = node.get_tournaments().decode()
-    _tournaments = json.loads(_tournaments)
-    _tournaments = _tournaments if len(_tournaments) > 0 else {}
-    _tournaments_to_render = {}
-    for t in _tournaments:
-        _tournaments_to_render[t['id']] = {'data': {'completed': t['completed']}}
-    return render_template("index.html", tournaments=_tournaments_to_render)
-
-
-@app.route("/create_tournament", methods=["POST"])
-def create_tournament():
-    tournament_name = request.form["tournament_name"]
-    tournament_type = request.form["tournament_type"]
-    if tournament_name not in tournaments:
-        tournaments[tournament_name] = {
-            "type": tournament_type,
-            "players": [],
-            "games": [],
-            "winner": None,
-            "completed": False,
-        }
-
-    for t in tournaments:
-        node.send(t, tournaments[t])
-    return redirect(url_for("index"))
-
-
-@app.route("/add_player/<tournament_name>", methods=["POST"])
-def add_player(tournament_name):
-    player_name = request.form["player_name"]
-    _tournament = node.get(tournament_name)
-    _tournament = json.loads(_tournament)
-    if _tournament and not _tournament["completed"]:
-        _tournament['players'].append({"name": player_name, "score": 0})
-    node.send(tournament_name, _tournament)
-    return redirect(url_for("tournament", tournament_name=tournament_name))
-
-
-@app.route("/start_tournament/<tournament_name>", methods=["POST"])
-def start_tournament(tournament_name):
-    if tournament_name in tournaments and not tournaments[tournament_name]["completed"]:
-        players = tournaments[tournament_name]["players"]
-
-        if len(players) < 2:
-            return redirect(url_for("tournament", tournament_name=tournament_name))
-
-        if tournaments[tournament_name]["type"] == "elimination":
-            final_winner = simulate_elimination(players, tournament_name)
-            tournaments[tournament_name]["winner"] = final_winner
-
-        elif tournaments[tournament_name]["type"] == "round_robin":
-            final_winner = simulate_round_robin(players, tournament_name)
-            tournaments[tournament_name]["winner"] = final_winner
-
-        elif tournaments[tournament_name]["type"] == "group_stage":
-            groups = start_group_stage(players)  # Assume this function creates groups
-            group_winners = simulate_group_stage(groups, tournament_name)
-            tournaments[tournament_name]["winner"] = group_winners
-
-        # Mark tournament as completed and save results.
-        tournaments[tournament_name]["completed"] = True
-        save_results(tournament_name)  # Save detailed results
-        save_tournaments()  # Save overall tournament state
-
-    return redirect(url_for("tournament", tournament_name=tournament_name))
 
 
 def simulate_elimination(players, tournament_name):
@@ -171,47 +94,58 @@ def simulate_group_stage(groups, tournament_name):
     return group_winners
 
 
-def save_results(tournament_name):
-    results = {
-        "tournament": tournament_name,
-        "type": tournaments[tournament_name]["type"],  # Save tournament type
-        "players": tournaments[tournament_name]["players"],
-        "winner": tournaments[tournament_name]["winner"],
-        "games": tournaments[tournament_name]["games"],
-        "completed": tournaments[tournament_name]["completed"],
-    }
-
-    with open(f"{tournament_name}_results.json", "w") as f:
-        json.dump(results, f, indent=4)
-
-
-def save_tournaments():
-    with open("tournaments.json", "w") as f:
-        json.dump(tournaments, f, indent=4)
-
-
-@app.route("/set_winner/<tournament_name>", methods=["POST"])
-def set_winner(tournament_name):
-    winner_name = request.form["winner_name"]
-    _tournament = node.get(tournament_name).decode()
-    if tournament_name in tournaments and not tournaments[tournament_name]["completed"]:
-        tournaments[tournament_name]["winner"] = winner_name
-        tournaments[tournament_name][
-            "completed"
-        ] = True  # Marcar torneo como completado
-        save_results(tournament_name)  # Guardar resultados en archivo
-        save_tournaments()  # Guardar estado de torneos
-    return redirect(url_for("index"))
+@app.route("/")
+def index():
+    _tournaments = node.get_tournaments()
+    _tournaments = json.loads(_tournaments)
+    _tournaments_to_render = {}
+    for key, value in _tournaments.items():
+        _tournaments_to_render[key] = {'data': {'completed': value}}
+    return render_template("index.html", tournaments=_tournaments_to_render)
 
 
 @app.route("/tournament/<tournament_name>")
 def tournament(tournament_name):
     _tournament = node.get(tournament_name)
-    _tournament = json.loads(_tournament)
+    _tournament = json.loads(_tournament) if len(_tournament) > 0 else {}
     _tournament_to_render = {'data': _tournament}
     return render_template(
         "tournament.html", tournament=_tournament_to_render, name=tournament_name
     )
+
+
+@app.route("/add_player/<tournament_name>", methods=["POST"])
+def add_player(tournament_name):
+    player_name = request.form["player_name"]
+    _tournament = node.get(tournament_name)
+    _tournament = json.loads(_tournament)
+    if _tournament and not _tournament["completed"]:
+        _tournament['players'].append({"name": player_name, "score": 0})
+    node.send(tournament_name, _tournament)
+    return redirect(url_for("tournament", tournament_name=tournament_name))
+
+
+@app.route("/create_tournament", methods=["POST"])
+def create_tournament():
+    tournament_name = request.form["tournament_name"]
+    tournament_type = request.form["tournament_type"]  # New field for type
+    if tournament_name not in tournaments:
+        tournaments.append(tournament_name)
+        new_tournament = {
+            "type": tournament_type,
+            "players": [],
+            "games": [],
+            "winner": None,
+            "completed": False,
+        }
+        node.send(tournament_name, new_tournament)
+    return redirect(url_for("index"))
+
+
+@app.route("/start_tournament/<tournament_name>", methods=["POST"])
+def start_tournament(tournament_name):
+    node.simulate_tournament(tournament_name)
+    return redirect(url_for("tournament", tournament_name=tournament_name))
 
 
 if __name__ == "__main__":
@@ -221,4 +155,3 @@ if __name__ == "__main__":
 
     while True:
         pass
-
