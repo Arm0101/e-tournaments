@@ -185,7 +185,7 @@ class ChordNode:
                 return node
             return node.ref
         except Exception as e:
-            return self.ref
+            logging.info(f"Error finding predecessor")
 
     # Method to find the closest preceding finger of a given id
     def closest_preceding_finger(self, id: int) -> 'ChordNodeReference':
@@ -268,7 +268,7 @@ class ChordNode:
 
                         resp = self.predecessor2.check()
                         if resp == b'':
-                            logging.info('pred2 is dead')
+                            logging.info(f'pred2 is dead pred3: {self.predecessor3}')
                             self.dist_data(self.pred2_data)
                             if self.predecessor3:
                                 if self.predecessor3.id == self.id:
@@ -278,11 +278,14 @@ class ChordNode:
                                     self.successor = self.ref
                                     continue
                                 else:
+                                    logging.info('Connect with predecessor3')
                                     self.predecessor = self.predecessor3
                                     self.predecessor.update_successor(self.ref)
                                     self.successor = self.predecessor
                                     self.predecessor2 = self.predecessor.predecessor
                                     self.predecessor3 = self.predecessor2.predecessor if self.predecessor2 else None
+                            else:
+                                self.send_broadcast_join()
 
                         else:
                             logging.info(f'new pred : {self.predecessor}')
@@ -313,29 +316,34 @@ class ChordNode:
 
     def get_data_from_predecessors(self):
         while True:
+            try:
+                if self.predecessor and self.predecessor.id != self.id:
+                    _pred_data = self.predecessor.send_predecessor_data().decode()
+                    logging.info(f'Saving pred data {_pred_data}')
 
-            if self.predecessor:
-                _pred_data = self.predecessor.send_predecessor_data().decode()
-                logging.info(f'Saving pred data {_pred_data}')
+                    _pred_data = json.loads(_pred_data)
 
-                if _pred_data:
-                    self.pred_data = json.loads(_pred_data)
+                    if _pred_data:
+                        self.pred_data = _pred_data
 
-            if self.predecessor2:
-                _pred2_data = self.predecessor2.send_predecessor_data().decode()
-                logging.info(f'Saving pred2 data {_pred2_data}')
-                if _pred2_data:
-                    self.pred2_data = json.loads(_pred2_data)
+                if self.predecessor2 and self.predecessor2.id != self.id:
+                    _pred2_data = self.predecessor2.send_predecessor_data().decode()
+                    logging.info(f'Saving pred2 data {_pred2_data}')
+
+                    _pred2_data = json.loads(_pred2_data)
+                    if _pred2_data:
+                        self.pred2_data = _pred2_data
+            except Exception as e:
+                logging.info(f'Error in get_data_from_predecessors {e}')
 
             logging.info(f'pred: {self.pred_data}, pred2: {self.pred2_data}')
             time.sleep(8)
 
     def update_tournament_sim(self, name, data):
-        with self.lock:
-            logging.info(f'RESULT SIM {data}')
-            self.data[name] = data[name]
-            if name in self.tournaments:
-                self.tournaments[name] = data[name]['completed']
+        logging.info(f'RESULT SIM {data}')
+        self.data[name] = data[name]
+        if name in self.tournaments:
+            self.tournaments[name] = data[name]['completed']
 
     def _simulate_tournament(self, t_name):
         logging.info(f'RUN TOURNAMENT {t_name} IN NODE: {self.id}')
@@ -359,7 +367,11 @@ class ChordNode:
             logging.info(f'{hash_function(id, self.m)}: {data} saved')
 
     def get(self, id):
-        return self.retrieve_key(id)
+        try:
+            return self.retrieve_key(id)
+        except Exception as e:
+            logging.error(f'Error in get {id}: {e}')
+            return {}
 
     def update_data(self):
         while True:

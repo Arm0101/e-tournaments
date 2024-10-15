@@ -45,26 +45,24 @@ class TournamentSimulator:
 
                     game_info = f"{p1['name']} vs {p2['name']} - Pending"
                     self.data_t[self.tournament_id]["games"].append(game_info)
-
+                    time.sleep(5)
                     winner = random.choice([p1, p2])
                     winner["score"] += 1
 
                     next_round.append(winner)
 
+                    for player in players:
+                        player["active"] = player in next_round
+
                     game_info = f"{p1['name']} vs {p2['name']} - Winner: {winner['name']}"
                     self.data_t[self.tournament_id]["games"][-1] = game_info
+                    self.node.update_tournament_result(self.tournament_id, self.data_t)
 
                 if active_players:
                     next_round.append(active_players[0])
 
-                for player in players:
-                    player["active"] = player in next_round
             logging.info('updating tournament result')
             self.node.update_tournament_result(self.tournament_id, self.data_t)
-
-            if len([p for p in players if p['active']]) < 2:
-                continue
-            time.sleep(10)
 
     def run_simulation(self):
         threading.Thread(target=self.simulate_elimination_tournament, daemon=True).start()
