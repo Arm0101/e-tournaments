@@ -33,17 +33,46 @@
             <input
               type="text"
               name="tournament_name"
-              placeholder="Tournament Name"
+              placeholder="Nombre del Torneo"
               required
             />
             <select class="custom-select-sm" name="tournament_type">
-              <option value="elimination">Elimination</option>
+              <option value="elimination">Eliminación</option>
               <option value="round_robin">Round Robin</option>
-              <option value="group_stage">Group Stage</option>
+              <option value="group_stage">Fase de Grupos</option>
             </select>
-            <button class="btn btn-dark" type="submit">
-              Create Tournament
-            </button>
+            <button class="btn btn-dark" type="submit">Crear Torneo</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Nuevo formulario para seleccionar el tipo de jugador -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <h2 class="card-title">Seleccionar Tipo de Jugador</h2>
+          <form method="POST" action="{{ url_for('select_player_type') }}">
+            <select class="custom-select-sm" name="player_type" required>
+              <option value="rock">Solo Roca</option>
+              <option value="paper">Solo Papel</option>
+              <option value="scissors">Solo Tijera</option>
+              <option value="random">Aleatorio</option>
+            </select>
+            <button class="btn btn-dark" type="submit">Seleccionar Tipo</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Formulario para cargar un archivo de Python -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <h2 class="card-title">Cargar Archivo Python</h2>
+          <form
+            method="POST"
+            action="{{ url_for('upload_python_file') }}"
+            enctype="multipart/form-data"
+          >
+            <input type="file" name="python_file" accept=".py" required />
+            <button class="btn btn-dark" type="submit">Cargar Archivo</button>
           </form>
         </div>
       </div>

@@ -4,6 +4,7 @@ import json
 import os
 from chord.node import ChordNode
 import socket
+
 app = Flask(__name__)
 
 # Estructura de datos para almacenar torneos y jugadores
@@ -32,7 +33,7 @@ def start_round_robin(players):
 
 def start_group_stage(players, group_size=2):
     random.shuffle(players)
-    groups = [players[i: i + group_size] for i in range(0, len(players), group_size)]
+    groups = [players[i : i + group_size] for i in range(0, len(players), group_size)]
 
     group_games = {}
 
@@ -49,7 +50,7 @@ def index():
     _tournaments = _tournaments if len(_tournaments) > 0 else {}
     _tournaments_to_render = {}
     for t in _tournaments:
-        _tournaments_to_render[t['id']] = {'data': {'completed': t['completed']}}
+        _tournaments_to_render[t["id"]] = {"data": {"completed": t["completed"]}}
     return render_template("index.html", tournaments=_tournaments_to_render)
 
 
@@ -77,7 +78,7 @@ def add_player(tournament_name):
     _tournament = node.get(tournament_name)
     _tournament = json.loads(_tournament)
     if _tournament and not _tournament["completed"]:
-        _tournament['players'].append({"name": player_name, "score": 0})
+        _tournament["players"].append({"name": player_name, "score": 0})
     node.send(tournament_name, _tournament)
     return redirect(url_for("tournament", tournament_name=tournament_name))
 
@@ -208,7 +209,7 @@ def set_winner(tournament_name):
 def tournament(tournament_name):
     _tournament = node.get(tournament_name)
     _tournament = json.loads(_tournament)
-    _tournament_to_render = {'data': _tournament}
+    _tournament_to_render = {"data": _tournament}
     return render_template(
         "tournament.html", tournament=_tournament_to_render, name=tournament_name
     )
@@ -221,4 +222,3 @@ if __name__ == "__main__":
 
     while True:
         pass
-
