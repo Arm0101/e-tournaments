@@ -24,7 +24,7 @@
         {% endfor %}
       </ul>
 
-      {% if not tournament.completed %}
+      {% if not tournament.data.completed %}
       <h2>Agregar Jugador</h2>
       <form action="/add_player/{{ name }}" method="post" class="mb-4">
         <div class="form-group">
@@ -45,13 +45,13 @@
       </form>
 
       {% else %}
-      <h3>Ganador del Torneo: {{ tournament.winner }}</h3>
+      <h3>Ganador del Torneo: {{ tournament.data.winner }}</h3>
       <p class="text-success">Este torneo ha sido completado.</p>
       {% endif %}
 
       <h2>Historial de Juegos</h2>
       <ul class="list-group mb-4">
-        {% for game in tournament.games %}
+        {% for game in tournament.data.games %}
         <li class="list-group-item">{{ game }}</li>
         {% endfor %}
       </ul>

@@ -6,9 +6,9 @@ import time
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(threadName)s] %(levelname)s: %(message)s')
 
 if __name__ == "__main__":
-    ip = socket.gethostbyname(socket.gethostname())
-    node = ChordNode(ip)
-    node.send(f't01', {'data': f'ajsdnkjasndkjasndkjas'})
-    logging.info(f'ALL TOURNAMENTS {node.get_tournaments()}')
-    while True:
-        pass
+    print(hash_function('torneo1', 8))
+    print(hash_function('torneo2', 8))
+    print(hash_function('torneo3', 8))
+    print(hash_function('torneo4', 8))
+    print(hash_function('torneo5', 8))
+    print(hash_function('torneo12', 8))
