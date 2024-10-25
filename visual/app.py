@@ -65,7 +65,7 @@ def create_tournament():
 @app.route("/add_player/<tournament_name>", methods=["POST"])
 def add_player(tournament_name):
     player_name = request.form["player_name"]
-    # _tournament = node.get(tournament_name)
+    _tournament = node.get(tournament_name)
     _tournament = json.loads(_tournament)
     if _tournament and not _tournament["completed"]:
         _tournament["players"].append({"name": player_name, "score": 0})
