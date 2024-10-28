@@ -19,7 +19,10 @@ class Handler:
         file = os.path.join(self.db_folder, f"{self.id}.json")
         if os.path.isfile(file):
             with open(file, 'r') as archivo:
-                return json.load(archivo)
+                try:
+                    return json.load(archivo)
+                except Exception as e:
+                    return {}
         return {}
 
     def create(self, id, data):

@@ -34,15 +34,16 @@ class ChordNode:
         self.pred2_data = {}
         self.lock = threading.Lock()
         self.tournaments = {}
-
+        self.leader = False
+        self.leader_ref = None
         # Start background threads for stabilization, fixing fingers, and checking predecessor
+        threading.Thread(target=self.start_server, daemon=True).start()  # Start server thread
         threading.Thread(target=self.listen_for_broadcast, daemon=True).start()
         threading.Thread(target=self.recv_tournament, daemon=True).start()
         threading.Thread(target=self.notify_tournament, daemon=True).start()
         threading.Thread(target=self.stabilize, daemon=True).start()  # Start stabilize thread
         threading.Thread(target=self.fix_fingers, daemon=True).start()  # Start fix fingers thread
         threading.Thread(target=self.check_predecessor, daemon=True).start()  # Start check predecessor thread
-        threading.Thread(target=self.start_server, daemon=True).start()  # Start server thread
         threading.Thread(target=self.get_data_from_predecessors, daemon=True).start()
         threading.Thread(target=self.update_data, daemon=True).start()
         self.send_broadcast_join()
@@ -101,6 +102,10 @@ class ChordNode:
                 logging.info(f"RECV JOIN from {node_id}  ({node_ip}:{node_port})")
 
                 self.handle_join(node_id, node_ip, node_port)
+            elif message[0] == "LEADER":
+                node_ip = message[1]
+                node_port = int(message[2])
+                self.leader_ref = ChordNodeReference(node_ip, node_port)
 
     def notify_tournament(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -130,6 +135,8 @@ class ChordNode:
 
                 if not message[0] == "TOURNAMENT":
                     continue
+                if not self.leader:
+                    continue
 
                 _tournaments = message[1]
                 tournaments = json.loads(_tournaments)
@@ -149,8 +156,10 @@ class ChordNode:
             except Exception as e:
                 logging.error(f"Error receiving tournament: {e}")
 
+            time.sleep(2)
+
     def get_tournaments(self):
-        return self.ref.send_tournaments()
+        return self.leader_ref.send_tournaments()
 
     def send_broadcast_join(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -174,6 +183,8 @@ class ChordNode:
         node = self.find_predecessor(id)  # Find predecessor of id
         if node:
             return node.successor  # Return successor of that node
+        else:
+            return self.ref
 
     # Method to find the predecessor of a given id
     def find_predecessor(self, id: int) -> 'ChordNodeReference':
@@ -181,9 +192,7 @@ class ChordNode:
         try:
             while not _inbetween(id, node.id, node.successor.id):
                 node = node.closest_preceding_finger(id)
-            if isinstance(node, ChordNodeReference):
-                return node
-            return node.ref
+            return node
         except Exception as e:
             logging.info(f"Error finding predecessor")
 
@@ -211,6 +220,24 @@ class ChordNode:
 
             logging.info(f"(NODE_CON) successor : {self.successor} predecessor {self.predecessor}, {self.predecessor2},"
                          f"{self.predecessor3}")
+
+            if self.id >= self.successor.id:
+                self.leader = True
+                self.leader_ref = ChordNodeReference(self.ip, self.port)
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                message = f"LEADER,{self.ip},{self.port}".encode('utf-8')
+
+                sock.sendto(message, ('255.255.255.255', BROADCAST_PORT))
+                logging.info(f"UPDATE LEADER")
+
+                sock.close()
+
+            else:
+                self.leader = False
+
+            logging.info(f'leader ref: {self.leader_ref}')
             time.sleep(10)
 
     # Notify method to inform the node about another node
@@ -304,6 +331,7 @@ class ChordNode:
     def store_key(self, key: str, value: str):
         key_hash = hash_function(key, self.m)
         node = self.find_successor(key_hash)
+        logging.info(f'STORE KEY {key} IN {node}')
         node.store_key(key, value)
         # self.data[key] = value  # Store in the current node
         # self.successor.store_key(key, value)  # Replicate to the successor
@@ -318,7 +346,7 @@ class ChordNode:
         while True:
             try:
                 if self.predecessor and self.predecessor.id != self.id:
-                    _pred_data = self.predecessor.send_predecessor_data().decode()
+                    _pred_data = self.predecessor.send_data().decode()
                     logging.info(f'Saving pred data {_pred_data}')
 
                     _pred_data = json.loads(_pred_data)
@@ -327,7 +355,7 @@ class ChordNode:
                         self.pred_data = _pred_data
 
                 if self.predecessor2 and self.predecessor2.id != self.id:
-                    _pred2_data = self.predecessor2.send_predecessor_data().decode()
+                    _pred2_data = self.predecessor2.send_data().decode()
                     logging.info(f'Saving pred2 data {_pred2_data}')
 
                     _pred2_data = json.loads(_pred2_data)
@@ -340,30 +368,93 @@ class ChordNode:
             time.sleep(8)
 
     def update_tournament_sim(self, name, data):
-        logging.info(f'RESULT SIM {data}')
-        self.data[name] = data[name]
-        if name in self.tournaments:
-            self.tournaments[name] = data[name]['completed']
 
-    def _simulate_tournament(self, t_name):
-        logging.info(f'RUN TOURNAMENT {t_name} IN NODE: {self.id}')
-        if t_name in self.data:
-            t_data = copy.deepcopy(self.data[t_name])
-            sim = TournamentSimulator(t_name, t_data, self.ref)
-            sim.run_simulation()
+        tournament_data = self.retrieve_key(name)
+        tournament_data = json.loads(tournament_data)
+        logging.info(f'UPDATE TOURNAMENT SIM {tournament_data}')
+        player_name = list(data['winner'].keys())[0]
+        player_l = list(data['l'].keys())[0]
+        score = data['winner'][player_name] + 1
+        key = f'{player_name}-{player_l}-{tournament_data['round']}'
+        if 'history' not in tournament_data:
+            tournament_data['history'] = [key]
+        else:
+            if key not in tournament_data['history']:
+                tournament_data['history'].append(key)
+            else:
+                return
+
+        for player in tournament_data['players']:
+            if player['name'] == player_name and player['score'] < score:
+                player['score'] = score
+                player['next_round'] = True
+                player['active'] = False
+            elif player['name'] == player_l:
+                player['active'] = False
+                player['next_round'] = False
+
+        tournament_data['games'].append(f'{player_name} vs {player_l}')
+        tournament_data['temp'] -= 1
+        self.store_key(name, tournament_data)
+        if tournament_data['temp'] == 0:
+            self._simulate(name)
+
+    def _simulate(self, tournament_name):
+        logging.info(f'COORDINATE TOURNAMENT {self.id} IN NODE: {self.id}')
+        node = self.find_successor(hash_function(tournament_name, self.m))
+        tournament_data = node.retrieve_key(tournament_name)
+        tournament_data = json.loads(tournament_data)
+        players = tournament_data['players']
+        ttype = tournament_data['type']
+        games = TournamentSimulator.generate_games(players, ttype)
+        if len(games) == 0:
+            for player in tournament_data['players']:
+                if player.get('next_round', False):
+                    tournament_data['winner'] = player['name']
+                    tournament_data['completed'] = True
+                    self.store_key(tournament_name, tournament_data)
+                    return
+
+        if 'round' not in tournament_data:
+            tournament_data['round'] = 1
+        else:
+            tournament_data['round'] += 1
+        tournament_data['temp'] = len(games)
+        self.store_key(tournament_name, tournament_data)
+        for game in games:
+            key = f'{tournament_name}-{list(game['player1'].keys())[0]}-{list(game['player2'].keys())[0]}'
+            key_hash = hash_function(key, self.m)
+            # find node to run game
+            node1 = self.find_successor(key_hash)
+            node2 = node1.successor
+            if node2 and node2.id == node1.id:
+                node2 = None
+            _game_data = json.dumps(game)
+            tournament_data.update({'name': tournament_name})
+            _tournament = json.dumps(tournament_data)
+            if node1:
+                logging.info(f'Run game in node {node1}')
+
+                node1.run_game(_tournament, _game_data)
+
+            if node2:
+                logging.info(f'Run game in node2 {node2}')
+                node2.run_game(_tournament, _game_data)
+
+            logging.info(key)
+
+    def run_game(self, tournament, game):
+        threading.Thread(target=TournamentSimulator.simulate_game,
+                         args=(tournament, game, self), daemon=True).start()
 
     def simulate_tournament(self, tournament_name):
-        logging.info('SIMULATING')
-        key_hash = hash_function(tournament_name, self.m)
-        node = self.find_successor(key_hash)
-        if node:
-            node.simulate_tournament(tournament_name)
+        node = ChordNodeReference(self.leader_ref.ip, self.leader_ref.port)
+        return self._simulate(tournament_name)
 
     def send(self, id, data):
         if data:
             _data = json.dumps(data)
             self.store_key(id, _data)
-            self.tournaments[id] = data['completed']
             logging.info(f'{hash_function(id, self.m)}: {data} saved')
 
     def get(self, id):
@@ -429,10 +520,11 @@ class ChordNode:
                 elif option == CHECK:
                     conn.sendall("OK".encode())
                     conn.close()
+                    continue
 
                 elif option == CLOSEST_PRECEDING_FINGER:
                     id = int(data[1])
-                    if id and id != 'None':
+                    if id != 'None':
                         data_resp = self.closest_preceding_finger(id)
                 elif option == STORE_KEY:
                     key, value = _data.split('|')
@@ -442,12 +534,15 @@ class ChordNode:
                     key = key.split(',')[1]
                     if key and value and key != 'None' and value != 'None':
                         self.data[key] = value
+
                 elif option == RETRIEVE_KEY:
                     key = data[1]
-                    if key and key != 'None':
-                        resp = self.data.get(key, '')
-                        conn.sendall(json.dumps(resp).encode())
-                        conn.close()
+                    resp = self.data.get(key, '')
+                    resp = json.dumps(resp).encode()
+                    conn.sendall(resp)
+                    conn.close()
+                    continue
+
                 elif option == UPDATE_SUCCESSOR:
                     _ip = data[2]
                     if _ip and _ip != 'None':
@@ -456,26 +551,38 @@ class ChordNode:
                     _ip = data[2]
                     if _ip and _ip != 'None':
                         self.update_predecessor(ChordNodeReference(_ip, self.port))
-                elif option == SEND_PREDECESSOR_DATA:
+                elif option == SEND_DATA:
                     # _data = {'id': self.id, 'ip': self.ip, 'port': self.port}
                     conn.sendall(json.dumps(self.data).encode())
                     conn.close()
+                    continue
 
                 elif option == SEND_TOURNAMENTS:
-                    conn.sendall(json.dumps(self.tournaments).encode())
+                    resp = json.dumps(self.tournaments).encode()
+                    conn.sendall(resp)
                     conn.close()
+                    continue
+                elif option == RUN_GAME:
+                    _game = _data.split('|')
+                    tournament_data = _game[1]
+                    game_data = _game[2]
+                    game = json.loads(game_data)
+                    tournament = json.loads(tournament_data)
+                    self.run_game(tournament, game)
+                    continue
+
                 elif option == SIMULATE_TOURNAMENT:
                     t_name = data[1]
-                    conn.sendall(f'RUN TOURNAMENT {t_name}'.encode())
-                    self._simulate_tournament(t_name)
-                    conn.close()
+                    self._simulate(t_name)
+                    continue
 
                 elif option == TOURNAMENT_RESULT:
                     t_name, t_data = _data.split('|')
                     t_data = json.loads(t_data)
-                    t_name = key.split(',')[0]
+                    t_name = t_name.split(',')[1]
                     self.update_tournament_sim(t_name, t_data)
-                    conn.close()
+                    continue
+
                 if data_resp:
                     response = f'{data_resp.id},{data_resp.ip}'.encode()
                     conn.sendall(response)

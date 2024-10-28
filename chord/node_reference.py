@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 
 from .codes import *
 import socket
@@ -18,10 +19,20 @@ class ChordNodeReference:
     def _send_data(self, op: int, data: str = None) -> bytes:
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.settimeout(5)
+                s.settimeout(20)
                 s.connect((self.ip, self.port))
+                logging.info(f"OP DATAAAAA{op},{data}")
                 s.sendall(f'{op},{data}'.encode('utf-8'))
-                return s.recv(1024)
+                logging.info(f"SEND ALLLLL")
+
+                response = b''
+                while True:
+                    part = s.recv(4096)
+                    if not part:
+                        break
+                    response += part
+                logging.info(f"RESPONSEEEEEEEEEEE{response}")
+                return response
         except Exception as e:
             logging.error(f"Error sending data: {e}")
             return b''
@@ -29,14 +40,14 @@ class ChordNodeReference:
     def send_tournaments(self):
         return self._send_data(SEND_TOURNAMENTS)
 
-    def simulate_tournament(self, name):
+    def simulate(self, name: str):
         return self._send_data(SIMULATE_TOURNAMENT, name)
 
     def update_tournament_result(self, name, data):
         return self._send_data(TOURNAMENT_RESULT, f'{name}|{json.dumps(data)}')
 
-    def send_predecessor_data(self):
-        return self._send_data(SEND_PREDECESSOR_DATA)
+    def send_data(self):
+        return self._send_data(SEND_DATA)
 
     def update_successor(self, node: 'ChordNodeReference'):
         self._send_data(UPDATE_SUCCESSOR, f'{node.id},{node.ip}')
@@ -89,6 +100,9 @@ class ChordNodeReference:
     def retrieve_key(self, key: str) -> str:
         response = self._send_data(RETRIEVE_KEY, key).decode()
         return response
+
+    def run_game(self, tournament: str, game: str):
+        return self._send_data(RUN_GAME, f'|{tournament}|{game}')
 
     def __str__(self) -> str:
         return f'({self.ip},{self.port})'
